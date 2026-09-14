@@ -5,6 +5,8 @@ import { db } from '@/lib/db';
 import { rpName, rpID, origin, storeChallenge } from '@/lib/webauthn';
 import { NextResponse } from 'next/server';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET() {
   try {
     const session = await getServerSession(authOptions);
