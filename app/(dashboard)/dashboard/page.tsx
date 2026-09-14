@@ -229,7 +229,7 @@ export default function DashboardOverview() {
               </div>
               <div>
                 <h4 className="text-sm font-bold text-white">System Integrity Active</h4>
-                <p className="text-xs text-slate-400">SQLite ACID Transactions</p>
+                <p className="text-xs text-slate-400">MongoDB Replica Set</p>
               </div>
             </div>
 
@@ -249,7 +249,7 @@ export default function DashboardOverview() {
             </div>
 
             <Link
-              href="/components/biometric-enrollment"
+              href="/dashboard/settings"
               className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold text-cyan-300 border border-cyan-500/20 transition"
             >
               <Fingerprint className="w-4 h-4 text-cyan-400" />
