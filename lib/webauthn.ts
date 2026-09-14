@@ -7,8 +7,11 @@ import { db } from './db';
 // ─── WebAuthn Configuration ───────────────────────────────────────────────
 // Relying Party (RP) configuration for FIDO2/WebAuthn
 export const rpName = 'AegisVote Enterprise';
-export const rpID = process.env.WEBAUTHN_RP_ID || 'localhost';
-export const origin = process.env.WEBAUTHN_ORIGIN || `http://${rpID}:3000`;
+const rawRpId = process.env.WEBAUTHN_RP_ID || 'localhost';
+const rawOrigin = process.env.WEBAUTHN_ORIGIN || `http://${rawRpId}:3000`;
+
+export const rpID = rawRpId.replace(/^https?:\/\//, '').replace(/\/$/, '');
+export const origin = rawOrigin.replace(/\/$/, '');
 
 /**
  * Database-backed challenge store for WebAuthn registration/authentication.
