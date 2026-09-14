@@ -134,28 +134,45 @@ export default function OrganizationsPage() {
                   )}
                 </div>
 
-                <div className="mt-4 pt-4 border-t border-slate-800/80 flex items-center justify-between text-xs">
-                  <div className="flex items-center gap-4">
-                    <span className="flex items-center gap-1.5 text-slate-400">
-                      <Vote className="w-3.5 h-3.5 text-cyan-400" />
-                      <span className="font-bold text-white">{org._count.elections}</span> Elections
-                    </span>
-                    <span className="flex items-center gap-1.5 text-slate-400">
-                      <Users className="w-3.5 h-3.5 text-purple-400" />
-                      <span className="font-bold text-white">{org._count.members}</span> Members
-                    </span>
+                <div className="mt-4 pt-4 border-t border-slate-800/80 space-y-3">
+                  <div className="flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-4">
+                      <span className="flex items-center gap-1.5 text-slate-400">
+                        <Vote className="w-3.5 h-3.5 text-cyan-400" />
+                        <span className="font-bold text-white">{org._count.elections}</span> Elections
+                      </span>
+                      <span className="flex items-center gap-1.5 text-slate-400">
+                        <Users className="w-3.5 h-3.5 text-purple-400" />
+                        <span className="font-bold text-white">{org._count.members}</span> Members
+                      </span>
+                    </div>
+
+                    {org.website && (
+                      <a
+                        href={org.website}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-slate-500 hover:text-cyan-400 transition"
+                      >
+                        <Globe className="w-4 h-4" />
+                      </a>
+                    )}
                   </div>
 
-                  {org.website && (
-                    <a
-                      href={org.website}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-slate-500 hover:text-cyan-400 transition"
+                  <div className="flex items-center gap-2 pt-1">
+                    <Link
+                      href={`/dashboard/orgs/${org.id}/members`}
+                      className="flex-1 text-center py-2 rounded-xl bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 font-semibold text-xs border border-purple-500/30 transition flex items-center justify-center gap-1.5"
                     >
-                      <Globe className="w-4 h-4" />
-                    </a>
-                  )}
+                      <Users className="w-3 h-3" /> Manage Members
+                    </Link>
+                    <Link
+                      href={`/orgs/${org.slug}`}
+                      className="flex-1 text-center py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-cyan-400 font-semibold text-xs border border-slate-700 transition flex items-center justify-center gap-1.5"
+                    >
+                      Public Portal <ArrowUpRight className="w-3 h-3" />
+                    </Link>
+                  </div>
                 </div>
               </motion.div>
             );

@@ -43,6 +43,21 @@ export async function POST(
       return NextResponse.json({ error: 'Voting for this election has closed.' }, { status: 400 });
     }
 
+    // ─── Voter Roll Eligibility Check ───────────────────────────────────
+    const voterRollEntry = await db.voterRoll.findFirst({
+      where: {
+        electionId,
+        userId,
+        status: 'APPROVED',
+      },
+    });
+
+    if (!voterRollEntry) {
+      return NextResponse.json({
+        error: 'You are not authorized to vote in this election. You must be on the approved voter roll.',
+      }, { status: 403 });
+    }
+
     const optionExists = election.options.some((opt) => opt.id === optionId);
     if (!optionExists) {
       return NextResponse.json({ error: 'Invalid candidate/option selected.' }, { status: 400 });

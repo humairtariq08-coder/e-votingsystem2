@@ -45,6 +45,7 @@ interface Election {
   _count: {
     votes: number;
   };
+  resultsAvailable?: boolean;
 }
 
 export default function ElectionResultsPage() {
@@ -106,27 +107,39 @@ export default function ElectionResultsPage() {
     ? 'Voting Closed'
     : `${Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))} days remaining`;
 
+  const resultsAvailable = election.resultsAvailable ?? isExpired;
+
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
       {/* Header */}
-      <div className="flex items-center gap-3">
-        <Link
-          href="/dashboard/elections"
-          className="p-2 rounded-xl bg-slate-900 border border-slate-800 hover:bg-slate-800 text-slate-400 hover:text-white transition"
-        >
-          <ArrowLeft className="w-4 h-4" />
-        </Link>
-        <div className="flex-1">
-          <h1 className="text-2xl font-bold text-white">{election.title}</h1>
-          <p className="text-xs text-slate-400">{election.organization.name}</p>
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <Link
+            href="/dashboard/elections"
+            className="p-2 rounded-xl bg-slate-900 border border-slate-800 hover:bg-slate-800 text-slate-400 hover:text-white transition"
+          >
+            <ArrowLeft className="w-4 h-4" />
+          </Link>
+          <div>
+            <h1 className="text-2xl font-bold text-white">{election.title}</h1>
+            <p className="text-xs text-slate-400">{election.organization.name}</p>
+          </div>
         </div>
 
-        <Link
-          href={`/elections/${election.id}`}
-          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-cyan-400 border border-slate-700 transition"
-        >
-          Public Ballot <ExternalLink className="w-3.5 h-3.5" />
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link
+            href={`/dashboard/elections/${election.id}/voters`}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-purple-500/10 hover:bg-purple-500/20 text-xs font-semibold text-purple-400 border border-purple-500/30 transition"
+          >
+            <Users className="w-3.5 h-3.5" /> Manage Voter Roll
+          </Link>
+          <Link
+            href={`/elections/${election.id}`}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-cyan-400 border border-slate-700 transition"
+          >
+            Public Ballot <ExternalLink className="w-3.5 h-3.5" />
+          </Link>
+        </div>
       </div>
 
       {/* Status Badges */}
@@ -150,8 +163,8 @@ export default function ElectionResultsPage() {
           { label: 'Total Ballots Cast', value: totalVotes, icon: Vote, color: 'text-cyan-400' },
           { label: 'Candidates / Options', value: election.options.length, icon: Users, color: 'text-purple-400' },
           {
-            label: 'Leading',
-            value: leadingOption?.name || '—',
+            label: 'Leading Candidate',
+            value: resultsAvailable ? leadingOption?.name || '—' : 'Hidden until deadline',
             icon: Trophy,
             color: 'text-amber-400',
           },
@@ -177,15 +190,27 @@ export default function ElectionResultsPage() {
         })}
       </div>
 
-      {/* Results Bar Chart */}
+      {/* Results Bar Chart or Pending Banner */}
       <div className="p-6 rounded-2xl bg-slate-900/60 border border-slate-800/80 space-y-5">
         <h2 className="text-lg font-bold text-white flex items-center gap-2">
-          <BarChart3 className="w-5 h-5 text-cyan-400" /> Live Vote Distribution
+          <BarChart3 className="w-5 h-5 text-cyan-400" /> Election Results & Distribution
         </h2>
 
-        {totalVotes === 0 ? (
+        {!resultsAvailable ? (
+          <div className="p-8 text-center bg-slate-950/40 rounded-xl border border-amber-500/20 space-y-3">
+            <Clock className="w-10 h-10 text-amber-400 mx-auto" />
+            <p className="text-amber-300 font-bold text-base">Results Withheld Until Deadline</p>
+            <p className="text-slate-400 text-xs max-w-md mx-auto">
+              To guarantee election fairness and avoid voter influence, candidate vote totals and leading positions will be revealed automatically once voting concludes on{' '}
+              <span className="text-cyan-400 font-semibold">{new Date(election.endDate).toLocaleDateString()}</span>.
+            </p>
+            <p className="text-xs text-slate-500 pt-2">
+              Total ballots submitted so far: <span className="text-white font-bold">{totalVotes}</span>
+            </p>
+          </div>
+        ) : totalVotes === 0 ? (
           <div className="p-8 text-center text-slate-500 text-sm">
-            No votes have been cast yet. Results will appear here in real-time.
+            No votes were cast in this election.
           </div>
         ) : (
           <div className="space-y-4">

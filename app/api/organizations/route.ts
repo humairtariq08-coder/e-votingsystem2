@@ -14,15 +14,48 @@ const createOrgSchema = z.object({
   tier: z.enum(['FREE', 'PRO', 'ENTERPRISE', 'GOVERNMENT']).default('FREE'),
 });
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
     const session = await getServerSession(authOptions);
+    const { searchParams } = new URL(req.url);
+    const slug = searchParams.get('slug');
+
+    // Public slug lookup (for public org page)
+    if (slug) {
+      const org = await db.organization.findUnique({
+        where: { slug },
+        include: {
+          _count: { select: { elections: true, members: true } },
+        },
+      });
+
+      if (!org) {
+        return NextResponse.json([]);
+      }
+
+      let membershipStatus: string | null = null;
+      if (session?.user?.id) {
+        const membership = await db.organizationMember.findUnique({
+          where: {
+            userId_organizationId: {
+              userId: session.user.id,
+              organizationId: org.id,
+            },
+          },
+        });
+        membershipStatus = membership?.status || null;
+      }
+
+      return NextResponse.json([{ ...org, membershipStatus }]);
+    }
+
+    // Authenticated user's own orgs
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const memberships = await db.organizationMember.findMany({
-      where: { userId: session.user.id },
+      where: { userId: session.user.id, status: 'APPROVED' },
       include: {
         organization: {
           include: {
@@ -74,6 +107,7 @@ export async function POST(req: Request) {
           create: {
             userId: session.user.id,
             role: 'OWNER',
+            status: 'APPROVED',
           },
         },
         auditLogs: {

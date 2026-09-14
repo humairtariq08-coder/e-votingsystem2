@@ -34,6 +34,7 @@ export async function GET(
     }
 
     let hasVoted = false;
+    let isEligible = false;
     if (session?.user?.id) {
       const status = await db.voterStatus.findUnique({
         where: {
@@ -44,11 +45,34 @@ export async function GET(
         },
       });
       hasVoted = !!status;
+
+      // Check voter roll eligibility
+      const rollEntry = await db.voterRoll.findFirst({
+        where: {
+          electionId: id,
+          userId: session.user.id,
+          status: 'APPROVED',
+        },
+      });
+      isEligible = !!rollEntry;
     }
+
+    // Hide per-option vote counts if election hasn't ended
+    const now = new Date();
+    const isEnded = now > new Date(election.endDate) || election.status === 'CLOSED';
+
+    const sanitizedOptions = election.options.map((opt: any) => ({
+      ...opt,
+      _count: isEnded ? opt._count : { votes: 0 },
+    }));
 
     return NextResponse.json({
       ...election,
+      options: sanitizedOptions,
+      _count: isEnded ? election._count : { votes: election._count.votes }, // total votes always visible
       hasVoted,
+      isEligible,
+      resultsAvailable: isEnded,
     });
   } catch (error: any) {
     console.error('Error fetching election detail:', error);

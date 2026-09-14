@@ -67,11 +67,13 @@ model Organization {
 
 // ─── Organization Membership ───────────────────────────────────────────────
 // Links users to organizations with role-based permissions.
+// Voters apply with status=PENDING, admins approve to status=APPROVED.
 model OrganizationMember {
   id             String       @id @default(auto()) @map("_id") @db.ObjectId
   userId         String       @db.ObjectId
   organizationId String       @db.ObjectId
-  role           String       @default("MANAGER") // "OWNER" | "ADMIN" | "MANAGER"
+  role           String       @default("VOTER") // "OWNER" | "ADMIN" | "MANAGER" | "VOTER"
+  status         String       @default("PENDING") // "PENDING" | "APPROVED" | "REJECTED"
   joinedAt       DateTime     @default(now())
 
   user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)

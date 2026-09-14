@@ -41,6 +41,7 @@ interface Election {
     slug: string;
   };
   hasVoted?: boolean;
+  isEligible?: boolean;
 }
 
 export default function ElectionVotingPage() {
@@ -195,6 +196,28 @@ export default function ElectionVotingPage() {
           <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-sm flex items-center gap-3">
             <AlertCircle className="w-5 h-5 shrink-0" />
             <span>{error}</span>
+          </div>
+        )}
+
+        {/* Not eligible notice */}
+        {session && election && election.isEligible === false && !election.hasVoted && (
+          <div className="p-6 rounded-2xl bg-amber-950/30 border border-amber-500/30 text-amber-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+              <div>
+                <p className="font-bold text-sm">Voter Roll Approval Required</p>
+                <p className="text-xs text-slate-300 mt-0.5">
+                  You are not registered on the official voter roll for this election. Apply to{' '}
+                  <span className="text-amber-300 font-bold">{election.organization.name}</span> to request voter access.
+                </p>
+              </div>
+            </div>
+            <Link
+              href={`/orgs/${election.organization.slug}`}
+              className="px-4 py-2 rounded-xl bg-amber-500 text-slate-950 font-bold text-xs shrink-0 hover:bg-amber-400 transition"
+            >
+              Apply to Organization
+            </Link>
           </div>
         )}
 
