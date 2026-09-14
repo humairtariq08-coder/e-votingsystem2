@@ -122,10 +122,10 @@ export default function ElectionsListPage() {
                 </span>
 
                 <Link
-                  href={`/elections/${election.id}`}
+                  href={`/dashboard/elections/${election.id}`}
                   className="flex items-center gap-1 text-slate-300 hover:text-white font-semibold"
                 >
-                  View Portal <ArrowUpRight className="w-3.5 h-3.5" />
+                  View Results <ArrowUpRight className="w-3.5 h-3.5" />
                 </Link>
               </div>
             </div>

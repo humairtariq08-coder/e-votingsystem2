@@ -30,7 +30,7 @@ export function DashboardSidebar({ currentOrgName = 'Aegis Portal' }: SidebarPro
     { label: 'Create Election', href: '/dashboard/elections/new', icon: PlusCircle },
     { label: 'Voter Rolls', href: '/dashboard/voter-rolls', icon: Users },
     { label: 'Audit Trail', href: '/dashboard/audit-logs', icon: ShieldCheck },
-    { label: 'Organizations', href: '/dashboard/orgs/new', icon: Building2 },
+    { label: 'Organizations', href: '/dashboard/orgs', icon: Building2 },
   ];
 
   return (
