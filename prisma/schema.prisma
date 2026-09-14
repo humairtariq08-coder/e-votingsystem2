@@ -1,0 +1,222 @@
+// ═══════════════════════════════════════════════════════════════════════════
+// AegisVote Enterprise — Multi-Tenant Cryptographic Voting Platform Schema
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// Privacy Architecture:
+// 1. VoterStatus tracks user participation (userId + electionId) — prevents double voting
+// 2. Vote contains ballot choice (optionId + electionId + receiptHash) — anonymous payload
+// 3. ZERO relational path between User/VoterStatus and Vote — cryptographic decoupling
+//
+// Multi-Tenant Architecture:
+// - Organization is the tenant boundary for all elections
+// - OrganizationMember provides role-based access (OWNER, ADMIN, MANAGER)
+// - VoterRoll scopes voter eligibility per election
+// - AuditLog provides immutable action trail per organization
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Global User Account ───────────────────────────────────────────────────
+// A user can be an org admin, a voter, or both.
+model User {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  email         String   @unique
+  passwordHash  String
+  name          String?
+  avatarUrl     String?
+  role          String   @default("USER") // "PLATFORM_ADMIN" | "USER"
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relationships
+  orgMemberships  OrganizationMember[]
+  voterStatuses   VoterStatus[]
+  voterRollEntries VoterRoll[]
+  auditLogs       AuditLog[]
+  invitationsSent Invitation[]
+  webauthnCreds   WebAuthnCredential[]
+}
+
+// ─── Organization (Tenant) ─────────────────────────────────────────────────
+// The primary tenant container. Each org gets its own portal, elections, and voter rolls.
+model Organization {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  name        String
+  slug        String   @unique // URL-safe identifier, e.g. "city-of-lahore"
+  description String?
+  logoUrl     String?
+  website     String?
+  tier        String   @default("FREE") // "FREE" | "PRO" | "ENTERPRISE" | "GOVERNMENT"
+  isVerified  Boolean  @default(false) // Manual verification for government orgs
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relationships
+  members    OrganizationMember[]
+  elections  Election[]
+  auditLogs  AuditLog[]
+  invitations Invitation[]
+}
+
+// ─── Organization Membership ───────────────────────────────────────────────
+// Links users to organizations with role-based permissions.
+model OrganizationMember {
+  id             String       @id @default(auto()) @map("_id") @db.ObjectId
+  userId         String       @db.ObjectId
+  organizationId String       @db.ObjectId
+  role           String       @default("MANAGER") // "OWNER" | "ADMIN" | "MANAGER"
+  joinedAt       DateTime     @default(now())
+
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, organizationId])
+}
+
+// ─── Election ──────────────────────────────────────────────────────────────
+// An election belongs to one organization. Supports multiple types and visibility levels.
+model Election {
+  id             String   @id @default(auto()) @map("_id") @db.ObjectId
+  organizationId String   @db.ObjectId
+  title          String
+  description    String
+  type           String   @default("CANDIDATE_SELECTION") // "CANDIDATE_SELECTION" | "REFERENDUM" | "MULTI_SELECT"
+  visibility     String   @default("PRIVATE")             // "PUBLIC" | "PRIVATE" | "INVITE_ONLY"
+  status         String   @default("DRAFT")               // "DRAFT" | "ACTIVE" | "PAUSED" | "CLOSED" | "ARCHIVED"
+  maxSelections    Int      @default(1) // For MULTI_SELECT type
+  requireBiometric Boolean  @default(false) // Require WebAuthn/fingerprint verification before voting
+  startDate        DateTime @default(now())
+  endDate        DateTime
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // Relationships
+  organization  Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  options       ElectionOption[]
+  voterStatuses VoterStatus[]
+  voterRoll     VoterRoll[]
+  votes         Vote[]
+}
+
+// ─── Election Option (Candidate / Referendum Choice) ───────────────────────
+// Generalized option model. Can represent a candidate, a Yes/No choice, or a custom option.
+model ElectionOption {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  electionId  String   @db.ObjectId
+  type        String   @default("CANDIDATE") // "CANDIDATE" | "YES" | "NO" | "CUSTOM"
+  name        String
+  bio         String?
+  party       String?
+  imageUrl    String?
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+
+  election Election @relation(fields: [electionId], references: [id], onDelete: Cascade)
+  votes    Vote[]
+}
+
+// ─── Voter Roll (Election-Scoped Eligibility) ──────────────────────────────
+// Determines who is allowed to vote in a specific election.
+// For PUBLIC elections: anyone authenticated can vote (no roll needed).
+// For PRIVATE/INVITE_ONLY: only users in the voter roll can vote.
+model VoterRoll {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  electionId String   @db.ObjectId
+  userId     String?  @db.ObjectId // Null if invited by email but not yet registered
+  email      String   // Always stored for matching
+  status     String   @default("INVITED") // "INVITED" | "APPROVED" | "REVOKED"
+  addedAt    DateTime @default(now())
+
+  election Election @relation(fields: [electionId], references: [id], onDelete: Cascade)
+  user     User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@unique([electionId, email])
+}
+
+// ─── Voter Status (Double-Vote Prevention) ─────────────────────────────────
+// Tracks that a user voted, without storing what they voted for.
+// Composite unique constraint guarantees one ballot per user per election.
+model VoterStatus {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId     String   @db.ObjectId
+  electionId String   @db.ObjectId
+  votedAt    DateTime @default(now())
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  election Election @relation(fields: [electionId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, electionId])
+}
+
+// ─── Anonymous Vote Payload ────────────────────────────────────────────────
+// CRITICAL SECURITY: Has NO relation to User or VoterStatus.
+// The cryptographic receiptHash allows voters to verify ballot inclusion
+// without revealing their identity or choice to others.
+model Vote {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  receiptHash String   @unique
+  electionId  String   @db.ObjectId
+  optionId    String   @db.ObjectId
+  createdAt   DateTime @default(now())
+
+  election Election       @relation(fields: [electionId], references: [id], onDelete: Cascade)
+  option   ElectionOption @relation(fields: [optionId], references: [id], onDelete: Cascade)
+}
+
+// ─── Audit Log (Immutable Event Trail) ─────────────────────────────────────
+// Every admin action is logged for compliance and transparency.
+model AuditLog {
+  id             String   @id @default(auto()) @map("_id") @db.ObjectId
+  organizationId String   @db.ObjectId
+  userId         String   @db.ObjectId
+  action         String   // "ELECTION_CREATED" | "ELECTION_CLOSED" | "VOTER_ADDED" | "MEMBER_INVITED" etc.
+  targetType     String   // "Election" | "VoterRoll" | "OrganizationMember" | "Organization"
+  targetId       String?  @db.ObjectId
+  metadata       String?  // JSON blob with contextual details
+  ipAddress      String?
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ─── Invitation ────────────────────────────────────────────────────────────
+// Token-based invitations for org members and election voters.
+model Invitation {
+  id             String       @id @default(auto()) @map("_id") @db.ObjectId
+  organizationId String       @db.ObjectId
+  invitedBy      String       @db.ObjectId
+  email          String
+  type           String       // "ORG_MEMBER" | "ELECTION_VOTER"
+  role           String?      // For org member invites: "ADMIN" | "MANAGER"
+  electionId     String?      @db.ObjectId // For election voter invites
+  token          String       @unique
+  status         String       @default("PENDING") // "PENDING" | "ACCEPTED" | "EXPIRED" | "REVOKED"
+  expiresAt      DateTime
+  createdAt      DateTime     @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  inviter      User         @relation(fields: [invitedBy], references: [id], onDelete: Cascade)
+}
+
+// ─── WebAuthn Credential (Biometric / Passkey) ─────────────────────────────
+// Stores registered FIDO2 credentials for fingerprint/Face ID/Windows Hello.
+// Biometric data NEVER leaves the device — only a public key is stored.
+model WebAuthnCredential {
+  id          String   @id @map("_id") // credentialID from WebAuthn
+  userId      String   @db.ObjectId
+  publicKey   String   // Base64url-encoded public key
+  counter     Int      @default(0) // Signature counter for replay attack prevention
+  deviceType  String   @default("singleDevice") // "singleDevice" | "multiDevice"
+  backedUp    Boolean  @default(false)
+  transports  String?  // Comma-separated: "internal,usb,ble,nfc"
+  createdAt   DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
