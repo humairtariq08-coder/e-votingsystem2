@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
     const userId = (session.user as any).id;
     const body = await req.json();
 
-    const expectedChallenge = getChallenge(userId);
+    const expectedChallenge = await getChallenge(userId);
     if (!expectedChallenge) {
       return NextResponse.json({ error: 'Challenge expired or not found' }, { status: 400 });
     }

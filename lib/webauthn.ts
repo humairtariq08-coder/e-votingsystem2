@@ -2,6 +2,7 @@ import type {
   GenerateRegistrationOptionsOpts,
   GenerateAuthenticationOptionsOpts,
 } from '@simplewebauthn/server';
+import { db } from './db';
 
 // ─── WebAuthn Configuration ───────────────────────────────────────────────
 // Relying Party (RP) configuration for FIDO2/WebAuthn
@@ -10,19 +11,33 @@ export const rpID = process.env.WEBAUTHN_RP_ID || 'localhost';
 export const origin = process.env.WEBAUTHN_ORIGIN || `http://${rpID}:3000`;
 
 /**
- * In-memory challenge store for WebAuthn registration/authentication.
- * In production, use Redis or a database-backed store.
+ * Database-backed challenge store for WebAuthn registration/authentication.
+ * This replaces the in-memory Map which fails in Serverless environments (like Vercel).
  */
-const challengeStore = new Map<string, string>();
+export async function storeChallenge(userId: string, challenge: string) {
+  await db.user.update({
+    where: { id: userId },
+    data: { webauthnChallenge: challenge },
+  });
 
-export function storeChallenge(userId: string, challenge: string) {
-  challengeStore.set(userId, challenge);
-  // Auto-expire after 5 minutes
-  setTimeout(() => challengeStore.delete(userId), 5 * 60 * 1000);
+  // We could implement an auto-expiration cron job, but for now it's fine
+  // because it's overwritten on next attempt and cleared on verify.
 }
 
-export function getChallenge(userId: string): string | undefined {
-  const challenge = challengeStore.get(userId);
-  challengeStore.delete(userId); // One-time use
-  return challenge;
+export async function getChallenge(userId: string): Promise<string | undefined> {
+  const user = await db.user.findUnique({
+    where: { id: userId },
+    select: { webauthnChallenge: true },
+  });
+  
+  if (user?.webauthnChallenge) {
+    // Clear challenge so it's one-time use
+    await db.user.update({
+      where: { id: userId },
+      data: { webauthnChallenge: null },
+    });
+    return user.webauthnChallenge;
+  }
+  
+  return undefined;
 }

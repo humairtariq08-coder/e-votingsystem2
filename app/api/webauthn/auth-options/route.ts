@@ -31,7 +31,8 @@ export async function GET() {
       userVerification: 'preferred',
     });
 
-    storeChallenge(userId, options.challenge);
+    // Store challenge for verification in database
+    await storeChallenge(userId, options.challenge);
 
     return NextResponse.json(options);
   } catch (error: any) {

@@ -39,8 +39,9 @@ model User {
   voterStatuses   VoterStatus[]
   voterRollEntries VoterRoll[]
   auditLogs       AuditLog[]
-  invitationsSent Invitation[]
-  webauthnCreds   WebAuthnCredential[]
+  invitationsSent   Invitation[]
+  webauthnCreds     WebAuthnCredential[]
+  webauthnChallenge String?
 }
 
 // ─── Organization (Tenant) ─────────────────────────────────────────────────

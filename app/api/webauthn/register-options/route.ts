@@ -38,8 +38,8 @@ export async function GET() {
       },
     });
 
-    // Store challenge for verification
-    storeChallenge(userId, options.challenge);
+    // Store challenge for verification in database
+    await storeChallenge(userId, options.challenge);
 
     return NextResponse.json(options);
   } catch (error: any) {
